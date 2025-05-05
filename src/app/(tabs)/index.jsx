@@ -36,6 +36,8 @@ export default function HomeScreen() {
     );
   }, []);
 
+  // To check username
+
   return (
     <View style={styles.container}>
       <View style={styles.pdfWrapper}>
