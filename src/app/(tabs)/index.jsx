@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from "react";
-import { View, Button, StyleSheet, Dimensions, Pressable } from "react-native";
-import Pdf from "react-native-pdf";
 import {
-  Canvas,
-  Image,
-  useImage,
-  FilterMode,
-  MipmapMode,
-} from "@shopify/react-native-skia";
-import { SafeAreaView } from "react-native-web";
+  View,
+  Button,
+  StyleSheet,
+  Dimensions,
+  Pressable,
+  SafeAreaView,
+  Text,
+} from "react-native";
+import Pdf from "react-native-pdf";
+import { Canvas, Image, useImage } from "@shopify/react-native-skia";
 
 const screen = Dimensions.get("window");
 
@@ -16,13 +17,13 @@ export default function HomeScreen() {
   const [points, setPoints] = useState([]);
   const [scale, setScale] = useState(1);
   const [pdfSize, setPdfSize] = useState({ width: 0, height: 0 });
+  const [newPointActive, setNewPointActive] = useState(false);
+  const [newPointCoords, setNewPointCoords] = useState(null);
   const image = useImage(require("../../assets/images/marker.png"));
 
   const handlePdfLoad = (width, height) => {
     setPdfSize({ width, height });
   };
-
-  console.log({ points });
 
   const handlePdfTap = (x, y) => {
     const pdfX = x / scale;
@@ -39,7 +40,32 @@ export default function HomeScreen() {
   // To check username
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      {newPointActive && (
+        <View
+          style={{
+            height: 30,
+            paddingHorizontal: 12,
+            alignItems: "center",
+            display: "flex",
+            flexDirection: "row",
+            backgroundColor: "#FBDFB1",
+            //   justifyContent: "space-between",
+          }}
+        >
+          <View className="flex-row flex-1">
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              className="ml-3 text-xs flex-row gap-x-2 w-[90%]"
+            >
+              <Text className=" text-[#693D11] font-medium">
+                Top on the map once to add the marker
+              </Text>
+            </Text>
+          </View>
+        </View>
+      )}
       <View style={styles.pdfWrapper}>
         <Pdf
           source={require("../../assets/map.pdf")}
@@ -53,14 +79,45 @@ export default function HomeScreen() {
         />
 
         {/* Absolute overlay for touch + Skia */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={(e) => {
-            const { locationX, locationY } = e.nativeEvent;
-            handlePdfTap(locationX, locationY);
-          }}
-        >
-          <Canvas style={StyleSheet.absoluteFill}>
+        {newPointActive ? (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={(e) => {
+              const { locationX, locationY } = e.nativeEvent;
+              const pdfX = locationX / scale;
+              const pdfY = locationY / scale;
+              setNewPointCoords({ x: pdfX, y: pdfY });
+              // handlePdfTap(locationX, locationY);
+            }}
+          >
+            <Canvas
+            pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                // {backgroundColor : "red"}
+              ]}
+            >
+              {newPointCoords &&
+                  image ? (
+                    <Image
+                      image={image}
+                      x={newPointCoords.x * scale - 12.5}
+                      y={newPointCoords.y * scale + 12.5}
+                      width={25}
+                      height={25}
+                    />
+                  ) : null
+                }
+            </Canvas>
+          </Pressable>
+        ) : (
+          <Canvas
+          pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFill,
+              // {backgroundColor : "red"}
+            ]}
+          >
             {points.map((point, index) =>
               image ? (
                 <Image
@@ -74,14 +131,35 @@ export default function HomeScreen() {
               ) : null
             )}
           </Canvas>
-        </Pressable>
+        )}
       </View>
 
       <View style={styles.controls}>
         <Button title="-" onPress={() => navigatePoint("-")} />
         <Button title="+" onPress={() => navigatePoint("+")} />
+
+        {newPointActive ? (
+          newPointCoords ? (
+            <>
+              <Button title="Undo" onPress={() => setNewPointCoords(null)} />
+              <Button
+                title="Save"
+                onPress={() => {
+                  setPoints((prev) => [...prev, { ...newPointCoords }]);
+                  setNewPointCoords(null);
+                  setNewPointActive(false);
+                }}
+              />
+            </>
+          ) : null
+        ) : (
+          <Button
+            title="Set New Point Active"
+            onPress={() => setNewPointActive(true)}
+          />
+        )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -96,7 +174,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   pdf: {
-    flex :1,
+    flex: 1,
     backgroundColor: "#ab2",
   },
   controls: {
