@@ -1,7 +1,7 @@
 // App.js
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TextInput, View, Button, ScrollView } from 'react-native';
-import { getUserStorage, addUserId,  loadUserStorages } from '../../storageManger';
+import { getUserStorage, addUserId,  loadUserStorages } from '../storageManger';
 
 export default function App() {
   const [userId, setUserId] = useState('');

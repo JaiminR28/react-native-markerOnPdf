@@ -1,9 +1,8 @@
 import { StyleSheet, View, Text, Button } from "react-native";
-import React, { useCallback, useRef, useMemo } from "react";
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { useCallback, useRef, useMemo } from "react";
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import BottomSheet, { BottomSheetFlashList, BottomSheetModal, BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { BottomSheetFlashList, BottomSheetModal, BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 
 
 const keyExtractor = (item) => item;
