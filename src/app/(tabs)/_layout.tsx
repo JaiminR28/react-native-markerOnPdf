@@ -43,6 +43,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="bottomSheetTest"
+        options={{
+          title: 'testBottomSHeet',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="plus.diamond.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="storage"
         options={{
           title: 'Storage',
