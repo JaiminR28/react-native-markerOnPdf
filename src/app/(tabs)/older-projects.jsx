@@ -1,7 +1,5 @@
 import {
-  View,
   TouchableOpacity,
-  ScrollView,
   SafeAreaView,
   Text,
   FlatList,
@@ -9,6 +7,10 @@ import {
 import { useRouter } from "expo-router";
 
 const older_Projects = [
+  {
+    name : "Canvas on Pdf",
+    url : "/Canvas-pdf"
+  },
   {
     name: "MMKV Storage",
     url: "/storage",
