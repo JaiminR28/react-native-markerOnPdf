@@ -1,186 +1,213 @@
-import React, { useCallback, useState } from "react";
 import {
-  View,
   Button,
-  StyleSheet,
-  Dimensions,
-  Pressable,
   SafeAreaView,
   Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import Pdf from "react-native-pdf";
-import { Canvas, Image, useImage } from "@shopify/react-native-skia";
-
-const screen = Dimensions.get("window");
+import * as LocalAuthentication from "expo-local-authentication";
+import { useEffect, useState } from "react";
+import * as Keychain from "react-native-keychain";
+import axios from "axios";
 
 export default function HomeScreen() {
-  const [points, setPoints] = useState([]);
-  const [scale, setScale] = useState(1);
-  const [pdfSize, setPdfSize] = useState({ width: 0, height: 0 });
-  const [newPointActive, setNewPointActive] = useState(false);
-  const [newPointCoords, setNewPointCoords] = useState(null);
-  const image = useImage(require("../../assets/images/marker.png"));
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [fingerprint, setFingerprint] = useState(false);
 
-  const handlePdfLoad = (width, height) => {
-    setPdfSize({ width, height });
+  const [userName, setUserName] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  async function storeTheCredentials() {
+    console.log("called to store the credentials");
+    await Keychain.setGenericPassword(userName, password, {
+      service: "com.jaiminrathwa28.myapp.auth.jwt",
+      accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET,
+      accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+      authenticationPrompt: {
+        title: "Authenticate to store your credentials",
+      },
+    });
+  }
+
+  async function loginUser(username, pass) {
+    try {
+      const response = await axios.post(
+        "https://sentrysafety.online/v1/api/auth/login",
+        {
+          userName: username,
+          password: pass,
+        }
+      );
+
+      const data = response?.data;
+      // console.log({data});
+      setLoggedIn(true);
+
+      if (!fingerprint) await storeTheCredentials();
+      return { success: true, data };
+    } catch (error) {
+      await Keychain.resetGenericPassword();
+
+      setFingerprint(false);
+      return {
+        success: false,
+        error: {
+          message: error?.response?.data || "Something went wrong",
+          status: error?.response?.status || 500,
+        },
+      };
+    }
+  }
+
+  const handleGetCredentialsFromKeyChain = async () => {
+    const isPasscode = await Keychain.isPasscodeAuthAvailable();
+
+    const hasCreds = await Keychain.hasGenericPassword({
+      service: "com.jaiminrathwa28.myapp.auth.jwt",
+    });
+
+    console.log("====================================");
+    console.log({ hasCreds });
+    console.log("====================================");
+
+    if (hasCreds) {
+      const creds = await Keychain.getGenericPassword({
+        service: "com.jaiminrathwa28.myapp.auth.jwt",
+        accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_CURRENT_SET,
+        accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        authenticationPrompt: {
+          title: "Authenticate using your fingerPrint",
+        },
+      });
+      console.log("Stored JWT:", creds);
+
+      if (creds.username && creds.password) {
+        await loginUser(creds.username, creds.password);
+      }
+    }
   };
 
-  const handlePdfTap = (x, y) => {
-    const pdfX = x / scale;
-    const pdfY = y / scale;
-    setPoints((prev) => [...prev, { x: pdfX, y: pdfY }]);
+  const handleBiometricAuthentication = async () => {
+    try {
+      // const biometricAuth = await LocalAuthentication.authenticateAsync({
+      //   promptMessage: "Login with Biometrics",
+      //   disableDeviceFallback: true,
+      //   cancelLabel: "Cancel",
+      // });
+      // console.log({ biometricAuth });
+      // if (biometricAuth.success) {
+
+      // }
+      await handleGetCredentialsFromKeyChain();
+    } catch (error) {
+      console.log(error);
+    }
   };
 
-  const navigatePoint = useCallback((direction) => {
-    setScale((prev) =>
-      direction === "+" ? prev + 0.1 : Math.max(1, prev - 0.1)
-    );
-  }, []);
+  const localAuthenticationFunc = async () => {
+    console.log("herere");
+    const compatible = await LocalAuthentication.hasHardwareAsync();
+    if (compatible) {
+      setIsBiometricSupported(true);
+    }
 
-  // To check username
+    const enroll = await LocalAuthentication.isEnrolledAsync();
 
+    if (enroll && compatible) return true;
+    else return false;
+  };
+
+  useEffect(() => {
+    const checkIfCredsAvailable = async () => {
+      const hasCreds = await Keychain.hasGenericPassword({
+        service: "com.jaiminrathwa28.myapp.auth.jwt",
+      });
+
+      const isBiometricAvailable = localAuthenticationFunc();
+
+      if (hasCreds && isBiometricAvailable) {
+        setFingerprint(true);
+      }
+    };
+
+    checkIfCredsAvailable();
+  });
   return (
-    <SafeAreaView style={styles.container}>
-      {newPointActive && (
-        <View
+    <SafeAreaView
+      style={{
+        display: "flex",
+        flex: 1,
+        backgroundColor: "#fff",
+        paddingTop: 200,
+      }}
+    >
+      <View style={{ padding: 20, rowGap: 12 }}>
+        {loggedIn && (
+          <Text
+            style={{ fontSize: 30, color: "green", marginHorizontal: "auto" }}
+          >
+            You Are Logged In !!
+          </Text>
+        )}
+        <View style={{ rowGap: 4 }}>
+          <Text>UserName</Text>
+          <TextInput
+            key="username"
+            textContentType="username"
+            style={{
+              borderWidth: 1,
+              borderRadius: 12,
+              padding: 12,
+              paddingVertical: 10,
+            }}
+            onChangeText={setUserName}
+            inputMode="text"
+          />
+        </View>
+
+        <View style={{ rowGap: 4 }}>
+          <Text>Password</Text>
+          <TextInput
+            key="password"
+            textContentType="password"
+            secureTextEntry={true}
+            style={{
+              borderWidth: 1,
+              borderRadius: 12,
+              padding: 12,
+              paddingVertical: 10,
+            }}
+            onChangeText={setPassword}
+            inputMode="text"
+            keyboardType="visible-password"
+          />
+        </View>
+        <TouchableOpacity
+          onPress={() => loginUser(userName, password)}
           style={{
-            height: 30,
-            paddingHorizontal: 12,
+            padding: 12,
+            borderRadius: 4,
+            backgroundColor: "#eee",
             alignItems: "center",
-            display: "flex",
-            flexDirection: "row",
-            backgroundColor: "#FBDFB1",
-            //   justifyContent: "space-between",
+            justifyContent: "center",
           }}
         >
-          <View className="flex-row flex-1">
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              className="ml-3 text-xs flex-row gap-x-2 w-[90%]"
-            >
-              <Text className=" text-[#693D11] font-medium">
-                Top on the map once to add the marker
-              </Text>
-            </Text>
-          </View>
-        </View>
-      )}
-      <View style={styles.pdfWrapper}>
-        <Pdf
-          source={require("../../assets/map.pdf")}
-          page={1}
-          style={styles.pdf}
-          scale={scale}
-          onLoadComplete={(pages, path, { width, height }) =>
-            handlePdfLoad(width, height)
-          }
-          // singlePage={true}
+          <Text style={{ color: "#111" }}>Login</Text>
+        </TouchableOpacity>
+      </View>
+
+      {fingerprint && (
+        <Button
+          title="Check for Bio Metric"
+          // onPress={() => LocalAuthenticationFunc()}
+          onPress={() => handleBiometricAuthentication()}
         />
+      )}
 
-        {/* Absolute overlay for touch + Skia */}
-        {newPointActive ? (
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={(e) => {
-              const { locationX, locationY } = e.nativeEvent;
-              const pdfX = locationX / scale;
-              const pdfY = locationY / scale;
-              setNewPointCoords({ x: pdfX, y: pdfY });
-              // handlePdfTap(locationX, locationY);
-            }}
-          >
-            <Canvas
-            pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                // {backgroundColor : "red"}
-              ]}
-            >
-              {newPointCoords &&
-                  image ? (
-                    <Image
-                      image={image}
-                      x={newPointCoords.x * scale - 12.5}
-                      y={newPointCoords.y * scale + 12.5}
-                      width={25}
-                      height={25}
-                    />
-                  ) : null
-                }
-            </Canvas>
-          </Pressable>
-        ) : (
-          <Canvas
-          pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              // {backgroundColor : "red"}
-            ]}
-          >
-            {points.map((point, index) =>
-              image ? (
-                <Image
-                  key={index}
-                  image={image}
-                  x={point.x * scale - 12.5}
-                  y={point.y * scale + 12.5}
-                  width={25}
-                  height={25}
-                />
-              ) : null
-            )}
-          </Canvas>
-        )}
-      </View>
-
-      <View style={styles.controls}>
-        <Button title="-" onPress={() => navigatePoint("-")} />
-        <Button title="+" onPress={() => navigatePoint("+")} />
-
-        {newPointActive ? (
-          newPointCoords ? (
-            <>
-              <Button title="Undo" onPress={() => setNewPointCoords(null)} />
-              <Button
-                title="Save"
-                onPress={() => {
-                  setPoints((prev) => [...prev, { ...newPointCoords }]);
-                  setNewPointCoords(null);
-                  setNewPointActive(false);
-                }}
-              />
-            </>
-          ) : null
-        ) : (
-          <Button
-            title="Set New Point Active"
-            onPress={() => setNewPointActive(true)}
-          />
-        )}
-      </View>
+      {loggedIn && <Button title="LogOut" onPress={() => setLoggedIn(false)} />}
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ababab",
-  },
-  pdfWrapper: {
-    flex: 1,
-    maxHeight: "80%",
-    position: "relative",
-  },
-  pdf: {
-    flex: 1,
-    backgroundColor: "#ab2",
-  },
-  controls: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    padding: 10,
-    backgroundColor: "#fff",
-  },
-});
